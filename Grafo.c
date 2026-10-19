@@ -1087,6 +1087,7 @@ int GBsalvaGrafoDot(Grafo* grafo, char* nomeArquivo) {
     return 1;
 }
 
+#ifndef GRAFO_SEM_MAIN
 int main(void) {
     Grafo* grafo = GGcriaGrafoTipo(5, 10, 1);
 
@@ -1140,29 +1141,4 @@ int main(void) {
 
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#endif
