@@ -1,551 +1,1008 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
+#include "Grafo.h"
 
-typedef struct aresta
-{
+/* Estruturas internas da TAD */
+typedef struct incidencia {
+    Aresta* aresta;
+    struct incidencia* proxima;
+} Incidencia;
+struct aresta {
     int id;
-    int idVerticePartida;
-    int idVerticeChegada;
-}Aresta;
-
-typedef struct vertice
-{
+    int alfa;
+    int omega;
+};
+struct vertice {
     int id;
-    int qtdArestas;
-    int* listaIdArestas;
-}Vertice;
 
-typedef struct grafo
-{
-    Aresta* listaAresta;
-    Vertice* listaVertice;
+    Incidencia* incidencias;
+    Incidencia* entradas;
+    Incidencia* saidas;
+};
+struct grafo {
+    int dirigido;
 
-    int qtdArestas;
     int qtdVertices;
+    int maxVertices;
 
-    int MaxArestas;
-    int MaxVertices;
+    int qtdArestas;
+    int maxArestas;
 
-    int ultIdVertice;
-    int ultIdAresta;
+    int proximoIdVertice;
+    int proximoIdAresta;
 
-    int eDirigido;
-} Grafo;
+    Vertice** vertices;
+    Aresta** arestas;
+};
 
-const Vertice VERTICE_ERRO = {-1, -1, NULL};
-const Aresta ARESTA_ERRO = {-1, -1, -1};
+/* Função auxiliar: libera uma lista de incidências. */
+static void liberaListaIncidencias(Incidencia* lista) {
+    while (lista != NULL) {
+        Incidencia* proxima = lista->proxima;
 
-// Funcoes uteis
+        free(lista);
 
-int existeGrafo(Grafo* grafo) {
-    return (grafo && grafo->listaVertice && grafo->listaAresta);
+        lista = proxima;
+    }
 }
+/* Cria um grafo não dirigido, preservando a assinatura original. */
+Grafo* GGcriaGrafo(int v, int a) {
+    return GGcriaGrafoTipo(v, a, 0);
+}
+/*
+ * Cria um grafo dirigido ou não dirigido.
+ *
+ * v: capacidade máxima de vértices.
+ * a: capacidade máxima de arestas.
+ * dirigido: 1 para dirigido; 0 para não dirigido.
+ *
+ * Retorna NULL se os parâmetros forem inválidos
+ * ou se não houver memória suficiente.
+ */
 
-
-Vertice* buscaVerticePorId(Grafo* grafo, int id) {
-    if(!existeGrafo(grafo))
+Grafo* GGcriaGrafoTipo(int v, int a, int dirigido) {
+    if (v < 0 || a < 0) {
         return NULL;
-
-    for (int i = 0; i < grafo->qtdVertices; i++)
-    {
-        Vertice* vertice = &grafo->listaVertice[i];
-        if (id == vertice->id)
-            return vertice; 
-    }
-    
-    return NULL;
-}
-
-int insereIdArestaNaListaDoVertice(Vertice* vertice, int idAresta, int qtdMaxArestas) {
-
-    if (vertice == NULL || vertice->listaIdArestas == NULL)
-        return 0;
-
-    for (int i = 0; i < vertice->qtdArestas; i++) 
-    {
-        int id = vertice->listaIdArestas[i];
-        if (id == idAresta)
-            return 1;
     }
 
-    if (vertice->qtdArestas >= qtdMaxArestas)
-        return 0;
-    
-    
-    vertice->listaIdArestas[vertice->qtdArestas++] = idAresta;
-    return 1;
+    if (dirigido != 0 && dirigido != 1) {
+        return NULL;
+    }
+
+    Grafo* grafo = malloc(sizeof(Grafo));
+
+    if (grafo == NULL) {
+        return NULL;
+    }
+
+    grafo->dirigido = dirigido;
+
+    grafo->proximoIdVertice = 0;
+    grafo->proximoIdAresta = 0;
+
+    grafo->qtdVertices = 0;
+    grafo->maxVertices = v;
+
+    grafo->qtdArestas = 0;
+    grafo->maxArestas = a;
+
+    grafo->vertices = NULL;
+    grafo->arestas = NULL;
+
+    if (v > 0) {
+        grafo->vertices = malloc(v * sizeof(Vertice*));
+
+        if (grafo->vertices == NULL) {
+            free(grafo);
+            return NULL;
+        }
+    }
+
+    if (a > 0) {
+        grafo->arestas = malloc(a * sizeof(Aresta*));
+
+        if (grafo->arestas == NULL) {
+            free(grafo->vertices);
+            free(grafo);
+            return NULL;
+        }
+    }
+
+    return grafo;
 }
-
-int menorIdVertice(Vertice* listaVertice, int tamanhoLista, int piso) {
-
-    if (listaVertice == NULL || tamanhoLista <= 0) {
+/* Informa se o grafo é dirigido. */
+int GehDirigido(Grafo* grafo) {
+    if (grafo == NULL) {
         return -1;
     }
 
-    int menor = -1;
-
-    for (int i = 0; i < tamanhoLista; i++) {
-        int idAtual = listaVertice[i].id;
-
-        if (idAtual >= piso) {
-            if (menor == -1 || idAtual < menor) {
-                menor = idAtual;
-            }
-        }
-    }
-
-    return menor;
+    return grafo->dirigido;
 }
-
-int existeVertice(Vertice* listaVertice, int tamanhoLista, int id) {
-    if (listaVertice == NULL || tamanhoLista <= 0) {
-        return 0;
-    }
-
-    for (int i = 0; i < tamanhoLista; i++)
-    {
-        Vertice vertice = listaVertice[i];
-        if (id == vertice.id)
-            return 1; 
-    }
-    
-    return 0;
-}
-
-Aresta criaAresta(int id, int idPartida, int idChegada) {
-    Aresta novaAresta;
-    novaAresta.id = id;
-    novaAresta.idVerticePartida = idPartida;
-    novaAresta.idVerticeChegada = idChegada;
-    
-
-    return novaAresta;
-}
-
-Vertice criaVertice(int id) {
-    Vertice novoVertice;
-    novoVertice.id = id;
-    novoVertice.listaIdArestas = NULL;
-    novoVertice.qtdArestas = 0;
-
-    return novoVertice;
-}
-
-void ordenaListaVertices(Vertice* listaVertice, int qtdVertices) {
-    for (int i = 0; i < qtdVertices - 1; i++) {
-        for (int j = 0; j < qtdVertices - i - 1; j++) {
-            if (listaVertice[j].id > listaVertice[j + 1].id) {
-                Vertice aux = listaVertice[j];
-                listaVertice[j] = listaVertice[j + 1];
-                listaVertice[j + 1] = aux;
-            }
-        }
-    }
-}
-
-Vertice criaVerticeNoGrafoComId(Grafo* grafo, int id) {
-    Vertice novoVertice;
-    novoVertice.id = id;
-    novoVertice.qtdArestas = 0;
-    novoVertice.listaIdArestas = malloc(sizeof(int) * grafo->MaxArestas);
-
-    if (grafo->qtdVertices >= grafo->MaxVertices)
-        return VERTICE_ERRO;
-
-    grafo->listaVertice[grafo->qtdVertices++] = novoVertice;
-
-    return novoVertice;
-}
-// Funcoes da implementação 
-
-Grafo* GGcriaGrafo(int v, int a) {
-    Grafo* novoGrafo = malloc(sizeof(Grafo));
-
-    if (!novoGrafo)
-        return NULL;
-
-    novoGrafo->eDirigido = 1;
-
-    novoGrafo->qtdVertices = 0;
-    novoGrafo->qtdArestas = 0;
-
-    novoGrafo->MaxVertices = v;
-    novoGrafo->MaxArestas = a;
-    
-    novoGrafo->ultIdVertice = 0;
-    novoGrafo->ultIdAresta = 0;
-    
-    novoGrafo->listaVertice = malloc(sizeof(Vertice) * v);
-    novoGrafo->listaAresta = malloc(sizeof(Aresta) * a);
-    
-    if (!novoGrafo->listaAresta || !novoGrafo->listaVertice)
-        return NULL;
-    
-    return novoGrafo;
-}
-
+/* Destrói o grafo e libera toda a memória alocada. */
 void GGdestroiGrafo(Grafo* grafo) {
-    if (!grafo || !grafo->listaAresta || !grafo->listaVertice)
+    if (grafo == NULL) {
         return;
+    }
 
-    free(grafo->listaAresta);
-    free(grafo->listaVertice);
+    /* Libera as listas de incidências de cada vértice. */
+
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        Vertice* vertice = grafo->vertices[i];
+
+        if (vertice != NULL) {
+            liberaListaIncidencias(vertice->incidencias);
+            liberaListaIncidencias(vertice->entradas);
+            liberaListaIncidencias(vertice->saidas);
+
+            free(vertice);
+        }
+    }
+
+    /* Libera cada aresta uma única vez. */
+
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        free(grafo->arestas[i]);
+    }
+
+    /* Libera os vetores e a estrutura do grafo. */
+
+    free(grafo->vertices);
+    free(grafo->arestas);
     free(grafo);
 }
+/* Cria um vértice e o adiciona ao grafo. */
+Vertice* GVcriaVertice(Grafo* grafo) {
+    if (grafo == NULL) {
+        return NULL;
+    }
 
-Vertice GVcriaVertice(Grafo* grafo) {
-    Vertice novoVertice;
-    novoVertice.id = ++grafo->ultIdVertice;
-    novoVertice.qtdArestas = 0;
-    novoVertice.listaIdArestas = malloc(sizeof(int) * grafo->MaxArestas);
+    /* Verifica se existe espaço para mais um vértice. */
+    if (grafo->qtdVertices >= grafo->maxVertices) {
+        return NULL;
+    }
 
-    if (grafo->qtdVertices >= grafo->MaxVertices)
-        return VERTICE_ERRO;
+    Vertice* vertice = malloc(sizeof(Vertice));
 
-    grafo->listaVertice[grafo->qtdVertices++] = novoVertice;
+    if (vertice == NULL) {
+        return NULL;
+    }
 
-    return novoVertice;
+    /* Inicializa o vértice. */
+    vertice->id = grafo->proximoIdVertice;
+
+    vertice->incidencias = NULL;
+    vertice->entradas = NULL;
+    vertice->saidas = NULL;
+
+    /* Adiciona o vértice ao vetor do grafo. */
+    grafo->vertices[grafo->qtdVertices] = vertice;
+
+    grafo->qtdVertices++;
+    grafo->proximoIdVertice++;
+
+    return vertice;
 }
-
+/* Verifica se existe um vértice com o ID informado. */
 int GBexisteIdVertice(Grafo* grafo, int id) {
-    if(!existeGrafo(grafo))
+    if (grafo == NULL) {
         return 0;
-
-    for (int i = 0; i < grafo->qtdVertices; i++)
-    {
-        Vertice vertice = grafo->listaVertice[i];
-        if (id == vertice.id)
-            return 1; 
     }
-    
-    return 0;
-}
 
-int GBexisteIdAresta(Grafo* grafo, int id) {
-    if(!existeGrafo(grafo))
-        return 0;
-
-    for (int i = 0; i < grafo->qtdArestas; i++)
-    {
-        Aresta aresta = grafo->listaAresta[i];
-        if (id == aresta.id)
-            return 1; 
-    }
-    
-    return 0;
-}
-
-Aresta GAcriaAresta(Grafo* grafo, int v1, int v2) {
-    if (!GBexisteIdVertice(grafo, v1) || !GBexisteIdVertice(grafo, v2))
-        return ARESTA_ERRO;
-    
-    if (grafo->qtdArestas >= grafo->MaxArestas)
-        return ARESTA_ERRO;
-
-    Aresta novaAresta;
-    Vertice* verticePartida = buscaVerticePorId(grafo, v1);
-    Vertice* verticeChegada = buscaVerticePorId(grafo, v2);
-
-
-    novaAresta.id = ++grafo->ultIdAresta;
-    novaAresta.idVerticePartida = v1;
-    novaAresta.idVerticeChegada = v2;
-    grafo->listaAresta[grafo->qtdArestas++] = novaAresta;
-    insereIdArestaNaListaDoVertice(verticePartida, novaAresta.id, grafo->MaxArestas);
-    insereIdArestaNaListaDoVertice(verticeChegada, novaAresta.id, grafo->MaxArestas);
-
-    return novaAresta;
-}
-
-int GBexisteArestaDir(Grafo* grafo, int v1, int v2) {
-    if (!existeGrafo(grafo))
-        return 0;
-
-    if (!GBexisteIdVertice(grafo, v1) ||
-        !GBexisteIdVertice(grafo, v2))
-        return 0;
-
-    for (int i = 0; i < grafo->qtdArestas; i++)
-    {
-        Aresta aresta = grafo->listaAresta[i];
-
-        if (aresta.idVerticePartida == v1 && aresta.idVerticeChegada == v2)
-        {
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        if (grafo->vertices[i]->id == id) {
             return 1;
         }
     }
-    
+
+    return 0;
+}
+/* Retorna o ID do primeiro vértice do grafo. */
+int GVprimeiroVertice(Grafo* grafo) {
+    if (grafo == NULL || grafo->qtdVertices == 0) {
+        return -1;
+    }
+
+    return grafo->vertices[0]->id;
+}
+int GVproximoVertice(Grafo* grafo, int v1) {
+    if (grafo == NULL) {
+        return -1;
+    }
+
+    int proximo = -1;
+
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        int id = grafo->vertices[i]->id;
+
+        if (id > v1) {
+            if (proximo == -1 || id < proximo) {
+                proximo = id;
+            }
+        }
+    }
+
+    return proximo;
+}
+
+/* =========================================================
+   FUNÇÕES AUXILIARES
+   ========================================================= */
+
+/* Localiza um vértice pelo ID. */
+static Vertice* buscaVerticePorId(Grafo* grafo, int id) {
+    if (grafo == NULL) {
+        return NULL;
+    }
+
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        if (grafo->vertices[i]->id == id) {
+            return grafo->vertices[i];
+        }
+    }
+
+    return NULL;
+}
+/* Localiza uma aresta pelo ID. */
+static Aresta* buscaArestaPorId(Grafo* grafo, int id) {
+    if (grafo == NULL) {
+        return NULL;
+    }
+
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        if (grafo->arestas[i]->id == id) {
+            return grafo->arestas[i];
+        }
+    }
+
+    return NULL;
+}
+/* Cria um nó de incidência. */
+static Incidencia* criaIncidencia(Aresta* aresta) {
+    Incidencia* incidencia = malloc(sizeof(Incidencia));
+
+    if (incidencia == NULL) {
+        return NULL;
+    }
+
+    incidencia->aresta = aresta;
+    incidencia->proxima = NULL;
+
+    return incidencia;
+}
+/* Insere um nó no início de uma lista de incidências. */
+static void insereIncidencia(
+    Incidencia** lista,
+    Incidencia* incidencia
+) {
+    incidencia->proxima = *lista;
+    *lista = incidencia;
+}
+
+/* =========================================================
+   GBexisteIdAresta
+   ========================================================= */
+
+/* Verifica se existe uma aresta com o ID informado. */
+int GBexisteIdAresta(Grafo* grafo, int id) {
+    if (grafo == NULL) {
+        return 0;
+    }
+
+    return buscaArestaPorId(grafo, id) != NULL;
+}
+
+
+/* =========================================================
+   GAcriaAresta
+   ========================================================= */
+
+/*
+ * Cria uma aresta entre dois vértices existentes.
+ *
+ * Retorna:
+ * - Ponteiro para a aresta criada em caso de sucesso.
+ * - NULL em caso de erro.
+ */
+Aresta* GAcriaAresta(Grafo* grafo, int v1, int v2) {
+    if (grafo == NULL) {
+        return NULL;
+    }
+
+    /* Verifica se os dois vértices existem. */
+    Vertice* origem = buscaVerticePorId(grafo, v1);
+    Vertice* destino = buscaVerticePorId(grafo, v2);
+
+    if (origem == NULL || destino == NULL) {
+        return NULL;
+    }
+
+    /* Verifica se ainda existe espaço para uma aresta. */
+    if (grafo->qtdArestas >= grafo->maxArestas) {
+        return NULL;
+    }
+
+    /*
+     * Não permite arestas paralelas.
+     * Em grafos não dirigidos, a ordem dos vértices não importa.
+     */
+    if (GBexisteAresta(grafo, v1, v2)) {
+        return NULL;
+    }
+
+    /* Aloca a estrutura da aresta. */
+    Aresta* aresta = malloc(sizeof(Aresta));
+
+    if (aresta == NULL) {
+        return NULL;
+    }
+
+    aresta->id = grafo->proximoIdAresta;
+    aresta->alfa = v1;
+    aresta->omega = v2;
+
+    /*
+     * Prepara os nós de incidência antes de alterar o grafo.
+     *
+     * Para uma aresta comum:
+     * - Duas incidências gerais.
+     * - Uma entrada e uma saída em grafo dirigido.
+     * - Duas entradas e duas saídas em grafo não dirigido.
+     *
+     * Para um laço:
+     * - Duas incidências gerais no mesmo vértice.
+     * - Uma entrada e uma saída em grafo dirigido.
+     * - Duas entradas e duas saídas em grafo não dirigido.
+     */
+
+    Incidencia* nos[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
+    int qtdNos = 0;
+
+    /* Incidências gerais nas duas extremidades. */
+    nos[qtdNos] = criaIncidencia(aresta);
+
+    if (nos[qtdNos] == NULL) {
+        free(aresta);
+        return NULL;
+    }
+
+    qtdNos++;
+
+    nos[qtdNos] = criaIncidencia(aresta);
+
+    if (nos[qtdNos] == NULL) {
+        for (int i = 0; i < qtdNos; i++) {
+            free(nos[i]);
+        }
+
+        free(aresta);
+        return NULL;
+    }
+
+    qtdNos++;
+
+    if (grafo->dirigido) {
+        /* Uma saída da origem e uma entrada no destino. */
+        nos[qtdNos] = criaIncidencia(aresta);
+
+        if (nos[qtdNos] == NULL) {
+            for (int i = 0; i < qtdNos; i++) {
+                free(nos[i]);
+            }
+
+            free(aresta);
+            return NULL;
+        }
+
+        qtdNos++;
+
+        nos[qtdNos] = criaIncidencia(aresta);
+
+        if (nos[qtdNos] == NULL) {
+            for (int i = 0; i < qtdNos; i++) {
+                free(nos[i]);
+            }
+
+            free(aresta);
+            return NULL;
+        }
+
+        qtdNos++;
+    } else {
+        /*
+         * Em grafos não dirigidos, entradas e saídas são
+         * tratadas como listas de incidências para permitir
+         * percorrer as arestas por qualquer extremidade.
+         */
+
+        for (int i = 0; i < 4; i++) {
+            nos[qtdNos] = criaIncidencia(aresta);
+
+            if (nos[qtdNos] == NULL) {
+                for (int j = 0; j < qtdNos; j++) {
+                    free(nos[j]);
+                }
+
+                free(aresta);
+                return NULL;
+            }
+
+            qtdNos++;
+        }
+    }
+
+    /*
+     * Todas as alocações foram bem-sucedidas.
+     * Agora podemos registrar a aresta no grafo.
+     */
+
+    grafo->arestas[grafo->qtdArestas] = aresta;
+    grafo->qtdArestas++;
+    grafo->proximoIdAresta++;
+
+    /* Registra as duas extremidades nas listas gerais. */
+    insereIncidencia(&origem->incidencias, nos[0]);
+    insereIncidencia(&destino->incidencias, nos[1]);
+
+    if (grafo->dirigido) {
+        /* nos[2]: saída da origem. */
+        insereIncidencia(&origem->saidas, nos[2]);
+
+        /* nos[3]: entrada no destino. */
+        insereIncidencia(&destino->entradas, nos[3]);
+    } else {
+        /* Entradas: uma incidência em cada extremidade. */
+        insereIncidencia(&origem->entradas, nos[2]);
+        insereIncidencia(&destino->entradas, nos[3]);
+
+        /* Saídas: uma incidência em cada extremidade. */
+        insereIncidencia(&origem->saidas, nos[4]);
+        insereIncidencia(&destino->saidas, nos[5]);
+    }
+
+    return aresta;
+}
+
+
+/* =========================================================
+   GBexisteArestaDir
+   ========================================================= */
+
+/* Verifica se existe uma aresta orientada de v1 para v2. */
+int GBexisteArestaDir(Grafo* grafo, int v1, int v2) {
+    if (grafo == NULL) {
+        return 0;
+    }
+
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        Aresta* aresta = grafo->arestas[i];
+
+        if (aresta->alfa == v1 && aresta->omega == v2) {
+            return 1;
+        }
+    }
+
     return 0;
 }
 
+
+/* =========================================================
+   GBexisteAresta
+   ========================================================= */
+
+/*
+ * Grafo dirigido:
+ * verifica se existe uma aresta de v1 para v2.
+ *
+ * Grafo não dirigido:
+ * verifica se existe uma aresta entre v1 e v2,
+ * independentemente da ordem dos vértices.
+ */
 int GBexisteAresta(Grafo* grafo, int v1, int v2) {
-
-    if (GBexisteArestaDir(grafo, v1, v2) && GBexisteArestaDir(grafo, v2, v1))
-    {
-        return 1;
+    if (grafo == NULL) {
+        return 0;
     }
+
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        Aresta* aresta = grafo->arestas[i];
+
+        if (grafo->dirigido) {
+            if (aresta->alfa == v1 && aresta->omega == v2) {
+                return 1;
+            }
+        } else {
+            if ((aresta->alfa == v1 && aresta->omega == v2) ||
+                (aresta->alfa == v2 && aresta->omega == v1)) {
+                return 1;
+            }
+        }
+    }
+
     return 0;
 }
 
-//pega o identificador de uma aresta dirigida
-Aresta GApegaArestaDir (Grafo* grafo, int v1, int v2) {
-    if (!GBexisteArestaDir(grafo, v1, v2))
-    {
-        return ARESTA_ERRO;
+
+/* =========================================================
+   GApegaArestaDir
+   ========================================================= */
+
+/* Retorna a aresta orientada de v1 para v2. */
+Aresta* GApegaArestaDir(Grafo* grafo, int v1, int v2) {
+    if (grafo == NULL) {
+        return NULL;
     }
 
-    for (int i = 0; i < grafo->qtdArestas; i++)
-    {
-        Aresta aresta = grafo->listaAresta[i];
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        Aresta* aresta = grafo->arestas[i];
 
-        if (aresta.idVerticePartida == v1 && aresta.idVerticeChegada == v2)
-        {
+        if (aresta->alfa == v1 && aresta->omega == v2) {
             return aresta;
         }
     }
 
-    return ARESTA_ERRO;
+    return NULL;
 }
 
-//pega o identificador de uma aresta não dirigida
-Aresta GApegaAresta(Grafo* grafo, int v1, int v2) {
-    if (!GBexisteAresta(grafo, v1, v2))
-    {
-        return ARESTA_ERRO;
+
+/* =========================================================
+   GApegaAresta
+   ========================================================= */
+
+/* Retorna a aresta entre v1 e v2, respeitando o tipo de grafo. */
+Aresta* GApegaAresta(Grafo* grafo, int v1, int v2) {
+    if (grafo == NULL) {
+        return NULL;
     }
-
-    for (int i = 0; i < grafo->qtdArestas; i++)
-    {
-        Aresta aresta = grafo->listaAresta[i];
-
-        if (aresta.idVerticePartida == v1 && aresta.idVerticeChegada == v2)
-        {
-            if (aresta.idVerticePartida == v2 && aresta.idVerticeChegada == v1)
-            {
-                return aresta;
-            }            
-        }
-    }
-
-    return ARESTA_ERRO;
-}
-
-//pega o primeiro vértice do grafo
-int GVprimeiroVertice(Grafo* grafo) {
-    if (!existeGrafo(grafo) || grafo->qtdVertices == 0)
-    {
-        return -1;
-    }
-    
-    return menorIdVertice(grafo->listaVertice, grafo->qtdVertices, -1);
-}
-
-//pega o próximo vértice do grafo
-int GVproximoVertice(Grafo* grafo, int v1){
-    if (!existeGrafo(grafo) || grafo->qtdVertices == 0)
-    {
-        return -1;
-    }
-
-    return menorIdVertice(grafo->listaVertice, grafo->qtdVertices, v1+1);
-}
-
-//pega a primeira aresta do grafo
-int GAprimeiraAresta(Grafo* grafo) {
-    if (!existeGrafo(grafo) || grafo->qtdArestas == 0) {
-        return -1;
-    }
-
-    int menor = grafo->listaAresta[0].id;
-
-    for (int i = 1; i < grafo->qtdArestas; i++) {
-        int idAtual = grafo->listaAresta[i].id;
-
-        if (idAtual < menor) {
-            menor = idAtual;
-        }
-    }
-
-    return menor;
-}
-
-// Pega a próxima aresta do grafo
-int GAproximaAresta(Grafo* grafo, int a1) {
-    if (!existeGrafo(grafo) || grafo->qtdArestas == 0) {
-        return -1;
-    }
-
-    int menor = -1;
 
     for (int i = 0; i < grafo->qtdArestas; i++) {
-        int idAtual = grafo->listaAresta[i].id;
+        Aresta* aresta = grafo->arestas[i];
 
-        if (idAtual > a1) {
-            if (menor == -1 || idAtual < menor) {
-                menor = idAtual;
+        if (grafo->dirigido) {
+            if (aresta->alfa == v1 && aresta->omega == v2) {
+                return aresta;
+            }
+        } else {
+            if ((aresta->alfa == v1 && aresta->omega == v2) ||
+                (aresta->alfa == v2 && aresta->omega == v1)) {
+                return aresta;
             }
         }
     }
 
-    return menor;
+    return NULL;
 }
 
-// pega número de vértices no grafo
-int GInumeroVertices(Grafo* grafo){
-    if (!existeGrafo(grafo)) {
+
+/* =========================================================
+   GAprimeiraAresta
+   ========================================================= */
+
+/* Retorna o menor ID de aresta existente. */
+int GAprimeiraAresta(Grafo* grafo) {
+    if (grafo == NULL || grafo->qtdArestas == 0) {
+        return -1;
+    }
+
+    int menorId = grafo->arestas[0]->id;
+
+    for (int i = 1; i < grafo->qtdArestas; i++) {
+        if (grafo->arestas[i]->id < menorId) {
+            menorId = grafo->arestas[i]->id;
+        }
+    }
+
+    return menorId;
+}
+
+
+/* =========================================================
+   GAproximaAresta
+   ========================================================= */
+
+/*
+ * Retorna o menor ID de aresta estritamente maior que a1.
+ * Retorna -1 se não houver outra aresta.
+ */
+int GAproximaAresta(Grafo* grafo, int a1) {
+    if (grafo == NULL) {
+        return -1;
+    }
+
+    int proxima = -1;
+
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        int id = grafo->arestas[i]->id;
+
+        if (id > a1 && (proxima == -1 || id < proxima)) {
+            proxima = id;
+        }
+    }
+
+    return proxima;
+}
+
+int GInumeroVertices(Grafo* grafo) {
+    if (grafo == NULL) {
         return -1;
     }
 
     return grafo->qtdVertices;
 }
 
-// Retorna o número máximo de vértices do grafo
 int GInumeroVerticesMax(Grafo* grafo) {
-    if (!existeGrafo(grafo)) {
+    if (grafo == NULL) {
         return -1;
     }
 
-    return grafo->MaxVertices;
+    return grafo->maxVertices;
 }
 
-// Retorna o número de arestas do grafo
 int GInumeroArestas(Grafo* grafo) {
-    if (!existeGrafo(grafo)) {
+    if (grafo == NULL) {
         return -1;
     }
 
     return grafo->qtdArestas;
 }
 
-// Retorna o número máximo de arestas do grafo
 int GInumeroArestasMax(Grafo* grafo) {
-    if (!existeGrafo(grafo)) {
+    if (grafo == NULL) {
         return -1;
     }
 
-    return grafo->MaxArestas;
+    return grafo->maxArestas;
 }
 
-// cria e carrega um grafo armazenado em arquivo
+int GIpegaGrau(Grafo* grafo, int v) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    int grau = 0;
+    Incidencia* atual = vertice->incidencias;
+
+    while (atual != NULL) {
+        grau++;
+        atual = atual->proxima;
+    }
+
+    return grau;
+}
+
+static int primeiraArestaIncidencia(Incidencia* lista) {
+    if (lista == NULL) {
+        return -1;
+    }
+
+    int menorId = lista->aresta->id;
+    Incidencia* atual = lista->proxima;
+
+    while (atual != NULL) {
+        if (atual->aresta->id < menorId) {
+            menorId = atual->aresta->id;
+        }
+
+        atual = atual->proxima;
+    }
+
+    return menorId;
+}
+
+static int proximaArestaIncidencia(Incidencia* lista, int a1) {
+    int proximoId = -1;
+    Incidencia* atual = lista;
+
+    while (atual != NULL) {
+        int id = atual->aresta->id;
+
+        if (id > a1 && (proximoId == -1 || id < proximoId)) {
+            proximoId = id;
+        }
+
+        atual = atual->proxima;
+    }
+
+    return proximoId;
+}
+
+int GAprimaAresta(Grafo* grafo, int v) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return primeiraArestaIncidencia(vertice->incidencias);
+}
+
+int GAproxAresta(Grafo* grafo, int v, int a1) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return proximaArestaIncidencia(vertice->incidencias, a1);
+}
+
+int GAprimaEntrada(Grafo* grafo, int v) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return primeiraArestaIncidencia(vertice->entradas);
+}
+
+int GAproxEntrada(Grafo* grafo, int v, int a1) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return proximaArestaIncidencia(vertice->entradas, a1);
+}
+
+int GAprimaSaida(Grafo* grafo, int v) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return primeiraArestaIncidencia(vertice->saidas);
+}
+
+int GAproxSaida(Grafo* grafo, int v, int a1) {
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return -1;
+    }
+
+    return proximaArestaIncidencia(vertice->saidas, a1);
+}
+
+int GBarestaLaco(Grafo* grafo, int a) {
+    Aresta* aresta = buscaArestaPorId(grafo, a);
+
+    if (aresta == NULL) {
+        return -1;
+    }
+
+    if (aresta->alfa == aresta->omega) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int GValfa(Grafo* grafo, int a) {
+    Aresta* aresta = buscaArestaPorId(grafo, a);
+
+    if (aresta == NULL) {
+        return -1;
+    }
+
+    return aresta->alfa;
+}
+
+int GVomega(Grafo* grafo, int a) {
+    Aresta* aresta = buscaArestaPorId(grafo, a);
+
+    if (aresta == NULL) {
+        return -1;
+    }
+
+    return aresta->omega;
+}
+
+int GVvizinho(Grafo* grafo, int v, int a) {
+    Aresta* aresta = buscaArestaPorId(grafo, a);
+
+    if (aresta == NULL) {
+        return -1;
+    }
+
+    if (!GBexisteIdVertice(grafo, v)) {
+        return -1;
+    }
+
+    if (aresta->alfa == v) {
+        return aresta->omega;
+    }
+
+    if (aresta->omega == v) {
+        return aresta->alfa;
+    }
+
+    return -1;
+}
+
+static void removeIncidenciasAresta(Incidencia** lista, Aresta* aresta) {
+    Incidencia* atual = *lista;
+    Incidencia* anterior = NULL;
+
+    while (atual != NULL) {
+        if (atual->aresta == aresta) {
+            Incidencia* remover = atual;
+
+            if (anterior == NULL) {
+                *lista = atual->proxima;
+            } else {
+                anterior->proxima = atual->proxima;
+            }
+
+            atual = atual->proxima;
+            free(remover);
+        } else {
+            anterior = atual;
+            atual = atual->proxima;
+        }
+    }
+}
+
+static void removeArestaInterna(Grafo* grafo, Aresta* aresta) {
+    /* Remove as incidências de todos os vértices. */
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        Vertice* vertice = grafo->vertices[i];
+
+        removeIncidenciasAresta(&vertice->incidencias, aresta);
+        removeIncidenciasAresta(&vertice->entradas, aresta);
+        removeIncidenciasAresta(&vertice->saidas, aresta);
+    }
+
+    /* Procura a aresta no vetor de arestas. */
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        if (grafo->arestas[i] == aresta) {
+            /* Desloca as arestas seguintes para a esquerda. */
+            for (int j = i; j < grafo->qtdArestas - 1; j++) {
+                grafo->arestas[j] = grafo->arestas[j + 1];
+            }
+
+            grafo->qtdArestas--;
+            break;
+        }
+    }
+
+    /* Libera a memória da aresta. */
+    free(aresta);
+}
+
+int GAremoveAresta(Grafo* grafo, int a) {
+    if (grafo == NULL) {
+        return 0;
+    }
+
+    Aresta* aresta = buscaArestaPorId(grafo, a);
+
+    if (aresta == NULL) {
+        return 0;
+    }
+
+    removeArestaInterna(grafo, aresta);
+
+    return 1;
+}
+
+int GVremoveVertice(Grafo* grafo, int v) {
+    if (grafo == NULL) {
+        return 0;
+    }
+
+    Vertice* vertice = buscaVerticePorId(grafo, v);
+
+    if (vertice == NULL) {
+        return 0;
+    }
+
+    /*
+     * Remove todas as arestas que possuem
+     * o vértice como alfa ou omega.
+     */
+    int i = 0;
+
+    while (i < grafo->qtdArestas) {
+        Aresta* aresta = grafo->arestas[i];
+
+        if (aresta->alfa == v || aresta->omega == v) {
+            removeArestaInterna(grafo, aresta);
+        } else {
+            i++;
+        }
+    }
+
+    /*
+     * Procura o vértice no vetor de vértices.
+     */
+    for (int i = 0; i < grafo->qtdVertices; i++) {
+        if (grafo->vertices[i] == vertice) {
+
+            /*
+             * Desloca os vértices seguintes
+             * para a esquerda.
+             */
+            for (int j = i; j < grafo->qtdVertices - 1; j++) {
+                grafo->vertices[j] = grafo->vertices[j + 1];
+            }
+
+            grafo->qtdVertices--;
+            break;
+        }
+    }
+
+    /* Libera a memória do vértice. */
+    free(vertice);
+
+    return 1;
+}
+
 Grafo* GGcarregaGrafo(char* f) {
-    FILE *arquivo = fopen(f, "r");
+    if (f == NULL) {
+        return NULL;
+    }
+
+    FILE* arquivo = fopen(f, "r");
 
     if (arquivo == NULL) {
-        perror("Erro ao abrir arquivo");
         return NULL;
     }
 
-    char linha[64];
-    if (fgets(linha, sizeof(linha), arquivo) == NULL) {
-        fclose(arquivo);
-        return NULL;
-    }
-    char tipoGrafo[20];
-    if (sscanf(linha, "%19s", tipoGrafo) != 1) {
-        fclose(arquivo);
-        return NULL;
-    }
-    int eDirecionado;
-    if (strcmp(tipoGrafo, "graph") == 0) {
-        eDirecionado = 0;
-    }
-    else if (strcmp(tipoGrafo, "digraph") == 0) {
-       eDirecionado = 1;
-    }
-    else {
-        printf("Formato de arquivo invalido.\n");
+    int qtdVertices;
+    int qtdArestas;
+
+    if (fscanf(arquivo, "%d %d", &qtdVertices, &qtdArestas) != 2) {
         fclose(arquivo);
         return NULL;
     }
 
-    int qtdMaxVertice = 50;
-    int qtdMaxAresta = 50;
-
-    Vertice* verticesArquivo = malloc(sizeof(Vertice) * qtdMaxVertice);
-    Aresta* arestasArquivo = malloc(sizeof(Aresta) * qtdMaxAresta);
-
-    int qtdVertice = 0;
-    int qtdAresta = 0;
-
-    if (!verticesArquivo || !arestasArquivo)
+    if (qtdVertices < 0 || qtdArestas < 0) {
+        fclose(arquivo);
         return NULL;
-
-    while (fgets(linha, sizeof(linha), arquivo)) {
-
-        if(strcmp(linha, "{") == 0) continue;
-        if(strcmp(linha, "}") == 0) continue;
-
-        if (qtdAresta + 2 >= qtdMaxAresta) {
-            qtdMaxAresta = qtdMaxAresta * 2;
-            arestasArquivo = realloc(arestasArquivo, sizeof(Aresta) * qtdMaxAresta);
-        }
-        if (qtdVertice + 2 >= qtdMaxVertice) {
-            qtdMaxVertice = qtdMaxVertice * 2;
-            verticesArquivo = realloc(verticesArquivo, sizeof(Vertice) * qtdMaxVertice);
-        }
-
-        int origem, destino;
-
-        if (eDirecionado)
-        {
-            if (sscanf(linha, "%d -> %d;", &origem, &destino) == 2) {
-                
-                arestasArquivo[qtdAresta++] = criaAresta(qtdAresta + 1, origem, destino);
-
-                if (!existeVertice(verticesArquivo, qtdVertice, origem)) {    
-                    verticesArquivo[qtdVertice++] = criaVertice(origem);
-                }
-                if (!existeVertice(verticesArquivo, qtdVertice, destino)) {
-                    verticesArquivo[qtdVertice++] = criaVertice(destino);
-                }
-            }
-        }
-        else
-        {
-            if (sscanf(linha, "%d -- %d;", &origem, &destino) == 2) {
-
-                arestasArquivo[qtdAresta++] = criaAresta(qtdAresta + 1, origem, destino);
-
-                if (!existeVertice(verticesArquivo, qtdVertice, origem)) {    
-                    verticesArquivo[qtdVertice++] = criaVertice(origem);
-                }
-                if (!existeVertice(verticesArquivo, qtdVertice, destino)) {
-                    verticesArquivo[qtdVertice++] = criaVertice(destino);
-                }
-            }
-        }
-        
     }
 
-    
+    Grafo* grafo = GGcriaGrafo(qtdVertices, qtdArestas);
 
-    Grafo* novoGrafo = GGcriaGrafo(qtdVertice, qtdAresta);
-
-    novoGrafo->eDirigido = eDirecionado;
-
-    for (int i = 0; i < qtdVertice; i++)
-    {
-        Vertice vertice = verticesArquivo[i];
-        criaVerticeNoGrafoComId(novoGrafo, vertice.id);
+    if (grafo == NULL) {
+        fclose(arquivo);
+        return NULL;
     }
 
-    for (int i = 0; i < qtdAresta; i++)
-    {
-        Aresta aresta = arestasArquivo[i];
-        GAcriaAresta(novoGrafo, aresta.idVerticePartida, aresta.idVerticeChegada);
-        
+    /* Cria os vértices. */
+    for (int i = 0; i < qtdVertices; i++) {
+        if (GVcriaVertice(grafo) == NULL) {
+            fclose(arquivo);
+            GGdestroiGrafo(grafo);
+            return NULL;
+        }
     }
 
-    free(arestasArquivo);
-    free(verticesArquivo);
-    
+    /* Lê e cria as arestas. */
+    for (int i = 0; i < qtdArestas; i++) {
+        int origem;
+        int destino;
+
+        if (fscanf(arquivo, "%d %d", &origem, &destino) != 2) {
+            fclose(arquivo);
+            GGdestroiGrafo(grafo);
+            return NULL;
+        }
+
+        if (GAcriaAresta(grafo, origem, destino) == NULL) {
+            fclose(arquivo);
+            GGdestroiGrafo(grafo);
+            return NULL;
+        }
+    }
+
     fclose(arquivo);
 
-    return novoGrafo;
+    return grafo;
 }
 
-// salva o grafo em arquivo
 int GBsalvaGrafo(Grafo* grafo, char* nomeArquivo) {
     if (grafo == NULL || nomeArquivo == NULL) {
         return 0;
@@ -554,292 +1011,135 @@ int GBsalvaGrafo(Grafo* grafo, char* nomeArquivo) {
     FILE* arquivo = fopen(nomeArquivo, "w");
 
     if (arquivo == NULL) {
-        perror("Erro ao criar arquivo");
         return 0;
     }
 
-    // Define o tipo do grafo
-    if (grafo->eDirigido) {
+    /* Escreve a quantidade de vértices e arestas. */
+    if (fprintf(arquivo, "%d %d\n",
+                grafo->qtdVertices,
+                grafo->qtdArestas) < 0) {
+        fclose(arquivo);
+        return 0;
+    }
+
+    /* Escreve os extremos de cada aresta. */
+    for (int i = 0; i < grafo->qtdArestas; i++) {
+        Aresta* aresta = grafo->arestas[i];
+
+        if (fprintf(arquivo, "%d %d\n",
+                    aresta->alfa,
+                    aresta->omega) < 0) {
+            fclose(arquivo);
+            return 0;
+        }
+    }
+
+    /* Verifica se houve erro ao fechar o arquivo. */
+    if (fclose(arquivo) != 0) {
+        return 0;
+    }
+
+    return 1;
+}
+
+int GBsalvaGrafoDot(Grafo* grafo, char* nomeArquivo) {
+    if (grafo == NULL || nomeArquivo == NULL) {
+        return 0;
+    }
+
+    FILE* arquivo = fopen(nomeArquivo, "w");
+
+    if (arquivo == NULL) {
+        return 0;
+    }
+
+    /* Define o tipo de grafo no arquivo DOT. */
+    if (grafo->dirigido) {
         fprintf(arquivo, "digraph G {\n");
     } else {
         fprintf(arquivo, "graph G {\n");
     }
 
-    // Salva os vertices
+    /* Declara todos os vértices. */
     for (int i = 0; i < grafo->qtdVertices; i++) {
-        fprintf(arquivo, "    %d;\n", grafo->listaVertice[i].id);
+        fprintf(arquivo, "    %d;\n", grafo->vertices[i]->id);
     }
 
-    // Salva as arestas
+    /* Escreve as arestas. */
     for (int i = 0; i < grafo->qtdArestas; i++) {
-        int origem = grafo->listaAresta[i].idVerticePartida;
-        int destino = grafo->listaAresta[i].idVerticeChegada;
+        Aresta* aresta = grafo->arestas[i];
 
-        if (grafo->eDirigido) {
-            fprintf(arquivo, "    %d -> %d;\n", origem, destino);
+        if (grafo->dirigido) {
+            fprintf(arquivo, "    %d -> %d;\n",
+                    aresta->alfa, aresta->omega);
         } else {
-            // Evita salvar a mesma ligação duas vezes
-            if (origem <= destino) {
-                fprintf(arquivo, "    %d -- %d;\n", origem, destino);
-            }
+            fprintf(arquivo, "    %d -- %d;\n",
+                    aresta->alfa, aresta->omega);
         }
     }
 
     fprintf(arquivo, "}\n");
 
-    fclose(arquivo);
+    if (fclose(arquivo) != 0) {
+        return 0;
+    }
 
     return 1;
 }
 
-//pega o grau do vértice
-int GIpegaGrau(Grafo* grafo, int v) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
+int main(void) {
+    Grafo* grafo = GGcriaGrafoTipo(5, 10, 1);
 
-    int qtdArestas = buscaVerticePorId(grafo, v)->qtdArestas;
-
-    
-    return qtdArestas;
-} 
-
-//pega primeira aresta na estrela do vértice, em grafos não dirigidos
-int GAprimaAresta(Grafo* grafo, int v) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-
-    if (vertice->qtdArestas == 0) {
-        return -1;
-    }
-
-    return vertice->listaIdArestas[0];
-}
-
-// pega próxima aresta na estrela do vértice, em grafos não dirigidos
-int GAproxAresta(Grafo* grafo, int v, int a1) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-
-    for (int i = 0; i < vertice->qtdArestas; i+=2) {
-        if (vertice->listaIdArestas[i] == a1) {
-            if (i + 2 < vertice->qtdArestas) {
-                return vertice->listaIdArestas[i + 2];
-            }
-
-            return -1;
-        }
-    }
-
-    return -1;
-}
-
-// pega primeira aresta na estrela de entrada do vértice, em grafos dirigidos
-int GAprimaEntrada(Grafo* grafo, int v) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-
-    for (int i = 0; i < vertice->qtdArestas; i++) {
-        int idAresta = vertice->listaIdArestas[i];
-
-        for (int j = 0; j < grafo->qtdArestas; j++) {
-            if (grafo->listaAresta[j].id == idAresta &&
-                grafo->listaAresta[j].idVerticeChegada == v) {
-                return idAresta;
-            }
-        }
-    }
-
-    return -1;
-}
-
-// pega próxima aresta na estrela de entrada do vértice, em grafos dirigidos
-int GAproxEntrada(Grafo* grafo, int v, int a1) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-    int encontrouArestaAnterior = 0;
-
-    for (int i = 0; i < vertice->qtdArestas; i++) {
-        int idAresta = vertice->listaIdArestas[i];
-
-        for (int j = 0; j < grafo->qtdArestas; j++) {
-            if (grafo->listaAresta[j].id == idAresta &&
-                grafo->listaAresta[j].idVerticeChegada == v) {
-
-                if (encontrouArestaAnterior) {
-                    return idAresta;
-                }
-
-                if (idAresta == a1) {
-                    encontrouArestaAnterior = 1;
-                }
-            }
-        }
-    }
-
-    return -1;
-}
-
-// Pega primeira aresta na estrela de saída do vértice, em grafos dirigidos
-int GAprimaSaida(Grafo* grafo, int v) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-
-    for (int i = 0; i < vertice->qtdArestas; i++) {
-        int idAresta = vertice->listaIdArestas[i];
-
-        for (int j = 0; j < grafo->qtdArestas; j++) {
-            if (grafo->listaAresta[j].id == idAresta &&
-                grafo->listaAresta[j].idVerticePartida == v) {
-                return idAresta;
-            }
-        }
-    }
-
-    return -1;
-}
-
-// Pega próxima aresta na estrela de saída do vértice, em grafos dirigidos
-int GAproxSaida(Grafo* grafo, int v, int a1) {
-    if (!GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    Vertice* vertice = buscaVerticePorId(grafo, v);
-    int encontrouAresta = 0;
-
-    for (int i = 0; i < vertice->qtdArestas; i++) {
-        int idAresta = vertice->listaIdArestas[i];
-
-        for (int j = 0; j < grafo->qtdArestas; j++) {
-            if (grafo->listaAresta[j].id == idAresta &&
-                grafo->listaAresta[j].idVerticePartida == v) {
-
-                if (encontrouAresta) {
-                    return idAresta;
-                }
-
-                if (idAresta == a1) {
-                    encontrouAresta = 1;
-                }
-            }
-        }
-    }
-
-    return -1;
-}
-
-// Verifica se uma aresta é um laço
-int GBarestaLaco(Grafo* grafo, int a) {
     if (grafo == NULL) {
-        return 0;
+        printf("Erro ao criar grafo.\n");
+        return 1;
     }
 
-    for (int i = 0; i < grafo->qtdArestas; i++) {
-        if (grafo->listaAresta[i].id == a) {
-            return grafo->listaAresta[i].idVerticePartida ==
-                   grafo->listaAresta[i].idVerticeChegada;
-        }
+    Vertice* v0 = GVcriaVertice(grafo);
+    Vertice* v1 = GVcriaVertice(grafo);
+    Vertice* v2 = GVcriaVertice(grafo);
+
+    if (v0 == NULL || v1 == NULL || v2 == NULL) {
+        printf("Erro ao criar vertices.\n");
+        GGdestroiGrafo(grafo);
+        return 1;
     }
+
+    /* Cria arestas entre os IDs 0, 1 e 2. */
+    Aresta* a0 = GAcriaAresta(grafo, 0, 1);
+    Aresta* a1 = GAcriaAresta(grafo, 1, 2);
+
+    if (a0 == NULL || a1 == NULL) {
+        printf("Erro ao criar arestas.\n");
+        GGdestroiGrafo(grafo);
+        return 1;
+    }
+
+    printf("Aresta 0 existe? %d\n",
+           GBexisteIdAresta(grafo, 0));
+
+    printf("Aresta 5 existe? %d\n",
+           GBexisteIdAresta(grafo, 5));
+
+    printf("Existe aresta de 0 para 1? %d\n",
+           GBexisteArestaDir(grafo, 0, 1));
+
+    printf("Existe aresta de 1 para 0? %d\n",
+           GBexisteArestaDir(grafo, 1, 0));
+
+    printf("Primeira aresta: %d\n",
+           GAprimeiraAresta(grafo));
+
+    printf("Proxima aresta apos 0: %d\n",
+           GAproximaAresta(grafo, 0));
+
+    printf("Proxima aresta apos 1: %d\n",
+           GAproximaAresta(grafo, 1));
+
+    GGdestroiGrafo(grafo);
 
     return 0;
 }
-
-// Pega o vértice de partida da aresta
-int GValfa(Grafo* grafo, int a) {
-    if (grafo == NULL) {
-        return -1;
-    }
-
-    for (int i = 0; i < grafo->qtdArestas; i++) {
-        if (grafo->listaAresta[i].id == a) {
-            return grafo->listaAresta[i].idVerticePartida;
-        }
-    }
-
-    return -1;
-}
-
-// Pega o vértice de chegada da aresta
-int GVomega(Grafo* grafo, int a) {
-    if (grafo == NULL) {
-        return -1;
-    }
-
-    for (int i = 0; i < grafo->qtdArestas; i++) {
-        if (grafo->listaAresta[i].id == a) {
-            return grafo->listaAresta[i].idVerticeChegada;
-        }
-    }
-
-    return -1;
-}
-
-// Pega o outro vértice no extremo da aresta
-int GVvizinho(Grafo* grafo, int v, int a) {
-    if (grafo == NULL || !GBexisteIdVertice(grafo, v)) {
-        return -1;
-    }
-
-    for (int i = 0; i < grafo->qtdArestas; i++) {
-        if (grafo->listaAresta[i].id == a) {
-            int origem = grafo->listaAresta[i].idVerticePartida;
-            int destino = grafo->listaAresta[i].idVerticeChegada;
-
-            if (origem == v) {
-                return destino;
-            }
-
-            if (destino == v) {
-                return origem;
-            }
-
-            return -1;
-        }
-    }
-
-    return -1;
-}
-
-int GehDirigido(Grafo* grafo) {
-    return grafo->eDirigido;
-}
-// int main(int argc, char const *argv[])
-// {
-//     Grafo* grafo = GGcarregaGrafo("grafo2.dot");
-
-//     printf("\n%d\n", GIpegaGrau(grafo, 1));
-//     GBsalvaGrafo(grafo, "salvamento.dot");
-    
-// }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
