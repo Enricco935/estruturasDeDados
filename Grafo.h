@@ -4,6 +4,7 @@ typedef struct aresta Aresta;
 typedef struct vertice Vertice;
 typedef struct grafo Grafo;
 
+int GehDirigido(Grafo* grafo);
 Grafo* GGcriaGrafo(int v, int a);
 void GGdestroiGrafo(Grafo* grafo);
 Vertice GVcriaVertice(Grafo* grafo);

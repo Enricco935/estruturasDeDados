@@ -118,6 +118,7 @@ Aresta criaAresta(int id, int idPartida, int idChegada) {
     novaAresta.id = id;
     novaAresta.idVerticePartida = idPartida;
     novaAresta.idVerticeChegada = idChegada;
+    
 
     return novaAresta;
 }
@@ -505,7 +506,6 @@ Grafo* GGcarregaGrafo(char* f) {
             if (sscanf(linha, "%d -- %d;", &origem, &destino) == 2) {
 
                 arestasArquivo[qtdAresta++] = criaAresta(qtdAresta + 1, origem, destino);
-                arestasArquivo[qtdAresta++] = criaAresta(qtdAresta + 1, destino, origem);
 
                 if (!existeVertice(verticesArquivo, qtdVertice, origem)) {    
                     verticesArquivo[qtdVertice++] = criaVertice(origem);
@@ -600,9 +600,6 @@ int GIpegaGrau(Grafo* grafo, int v) {
 
     int qtdArestas = buscaVerticePorId(grafo, v)->qtdArestas;
 
-    if (!grafo->eDirigido){
-        return qtdArestas / 2;
-    }
     
     return qtdArestas;
 } 
@@ -819,14 +816,17 @@ int GVvizinho(Grafo* grafo, int v, int a) {
     return -1;
 }
 
-int main(int argc, char const *argv[])
-{
-    Grafo* grafo = GGcarregaGrafo("grafo2.dot");
-
-    printf("\n%d\n", GIpegaGrau(grafo, 1));
-    GBsalvaGrafo(grafo, "salvamento.dot");
-    
+int GehDirigido(Grafo* grafo) {
+    return grafo->eDirigido;
 }
+// int main(int argc, char const *argv[])
+// {
+//     Grafo* grafo = GGcarregaGrafo("grafo2.dot");
+
+//     printf("\n%d\n", GIpegaGrau(grafo, 1));
+//     GBsalvaGrafo(grafo, "salvamento.dot");
+    
+// }
 
 
 
