@@ -1,220 +1,286 @@
-// Implementação de TADs simples e grafo
-
-// Alunos:
-// Enricco Augusto Rodrigues Faria  | RA: 0117036
-// João Vitor Da Silva Silverio     | RA: 0117181
-// 19/10/2026
-
-// Professor:
-// Walace de Almeida Rodrigues
-
-
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "AlgoritmoGrafo.h"
-#include "Fila.h"
+
 #include "Grafo.h"
-#include "Lista.h"
-#include "Pilha.h"
 
-static int comparaInteiros(void *a, void *b) {
-    return *(int *)a == *(int *)b;
+#define RESERVA_MANIPULACAO 10
+
+static int leInteiro(const char *mensagem, int *valor) {
+    printf("%s", mensagem);
+    return scanf("%d", valor) == 1;
 }
 
-static void testaPilha(void) {
-    int primeiro = 10;
-    int segundo = 20;
-    Pilha *pilha = Pcria();
-
-    Pinsere(pilha, &primeiro);
-    Pinsere(pilha, &segundo);
-
-    printf("Empilhei: 10, 20\n");
-    printf("Topo: %d\n", *(int *)Pexamina(pilha));
-    printf("Desempilhei: %d\n", *(int *)Premove(pilha));
-    printf("Tamanho restante: %d\n", Ptamanho(pilha));
-
-    Pdestroi(&pilha);
-}
-
-static void testaFila(void) {
-    int primeiro = 10;
-    int segundo = 20;
-    Fila *fila = Fcria();
-
-    Finsere(fila, &primeiro);
-    Finsere(fila, &segundo);
-
-    printf("Enfileirei: 10, 20\n");
-    printf("Primeiro da fila: %d\n", *(int *)Fexamina(fila));
-    printf("Desenfileirei: %d\n", *(int *)Fremove(fila));
-    printf("Tamanho restante: %d\n", Ftamanho(fila));
-
-    Fdestroi(&fila);
-}
-
-static void testaLista(void) {
-    int dez = 10;
-    int vinte = 20;
-    int quinze = 15;
-    Lista *lista = Lcria();
-
-    Linsere(lista, &dez, 0);
-    Linsere(lista, &vinte, 1);
-    Linsere(lista, &quinze, 1);
-
-    printf("Lista apos inserir 10, 20 e 15 na posicao 1: ");
-    for (int i = 0; i < Ltamanho(lista); i++) {
-        printf("%s%d", i == 0 ? "" : " -> ",
-               *(int *)Lexamina(lista, i));
-    }
-    printf("\nPosicao do valor 20: %d\n",
-           Llocaliza(lista, &vinte, comparaInteiros));
-
-    Ldestroi(&lista);
-}
-
-static void testaGrafo(void) {
-    printf("\nCriando um grafo nao dirigido com capacidade para "
-           "4 vertices e 3 arestas.\n");
-    Grafo *grafo = GGcriaGrafo(4, 3);
-    if (grafo == NULL) {
-        printf("Nao foi possivel criar o grafo.\n");
-        return;
-    }
-
-    printf("Adicionando os vertices v0, v1, v2 e v3...\n");
-    for (int i = 0; i < 4; i++) {
-        if (GVcriaVertice(grafo) == NULL) {
-            printf("Falha ao adicionar v%d.\n", i);
-            GGdestroiGrafo(grafo);
-            return;
-        }
-    }
-    printf("Vertices adicionados: %d\n", GInumeroVertices(grafo));
-
-    printf("Adicionando as arestas: v0-v1, v0-v2 e v1-v3...\n");
-    const int extremos[][2] = {{0, 1}, {0, 2}, {1, 3}};
-    for (int i = 0; i < 3; i++) {
-        if (GAcriaAresta(grafo, extremos[i][0], extremos[i][1]) == NULL) {
-            printf("Falha ao conectar v%d e v%d.\n",
-                   extremos[i][0], extremos[i][1]);
-            GGdestroiGrafo(grafo);
-            return;
-        }
-    }
-
-    printf("\nGrafo criado (%d vertices, %d arestas):\n",
+static void mostraGrafo(Grafo *grafo) {
+    printf("\nGrafo %s: %d vertice(s), %d aresta(s)\n",
+           GehDirigido(grafo) ? "dirigido" : "nao dirigido",
            GInumeroVertices(grafo), GInumeroArestas(grafo));
+
+    printf("Vertices:\n");
+    int vertice = GVprimeiroVertice(grafo);
+    if (vertice == -1) {
+        printf("  (nenhum)\n");
+    }
+    while (vertice != -1) {
+        printf("  v%d (grau %d)\n", vertice, GIpegaGrau(grafo, vertice));
+        vertice = GVproximoVertice(grafo, vertice);
+    }
+
+    printf("Arestas:\n");
     int aresta = GAprimeiraAresta(grafo);
+    if (aresta == -1) {
+        printf("  (nenhuma)\n");
+    }
     while (aresta != -1) {
-        printf("  a%d conecta v%d e v%d\n",
-               aresta, GValfa(grafo, aresta), GVomega(grafo, aresta));
+        printf("  a%d: v%d %s v%d\n", aresta, GValfa(grafo, aresta),
+               GehDirigido(grafo) ? "->" : "--", GVomega(grafo, aresta));
         aresta = GAproximaAresta(grafo, aresta);
     }
-
-    printf("\nConsultas:\n");
-    printf("  v0 existe? %s\n",
-           GBexisteIdVertice(grafo, 0) ? "sim" : "nao");
-    printf("  Existe aresta entre v0 e v1? %s\n",
-           GBexisteAresta(grafo, 0, 1) ? "sim" : "nao");
-    printf("  Existe aresta entre v0 e v3? %s\n",
-           GBexisteAresta(grafo, 0, 3) ? "sim" : "nao");
-    printf("  Grau de v0: %d (conectado a duas arestas)\n",
-           GIpegaGrau(grafo, 0));
-
-    printf("\nRepresentacao: v2 -- v0 -- v1 -- v3\n");
-    printf("                 a1    a0    a2\n");
-
-    if (GBsalvaGrafoDot(grafo, "grafo_teste.dot")) {
-        printf("\nGrafo salvo em 'grafo_teste.dot'. Abra o arquivo "
-               "com Graphviz para visualizar.\n");
-    } else {
-        printf("\nNao foi possivel salvar 'grafo_teste.dot'.\n");
-    }
-
-    GGdestroiGrafo(grafo);
-    printf("Grafo destruido e memoria liberada.\n");
 }
 
-static void executaCaminhoComPesos(void) {
-    const int arestas[][2] = {{5, 0}, {5, 3}, {2, 5}, {0, 2}, {0, 1}, {1, 2}, {1, 1}, {4, 3}};
-    const float pesos[] = {0, 1, 1, 1, 1, 1, 1, 1, 1};
+static Grafo *copiaComReserva(Grafo *original) {
+    int quantidadeVertices = GInumeroVertices(original);
+    int quantidadeArestas = GInumeroArestas(original);
 
-    printf("\n=== Demonstracao: caminho mais curto ===\n");
-    printf("Criando um grafo dirigido com vertices de 0 a 5.\n");
-    Grafo *grafo = GGcriaGrafoTipo(6, 8, 1);
+    if (quantidadeVertices > INT_MAX - RESERVA_MANIPULACAO ||
+        quantidadeArestas > INT_MAX - RESERVA_MANIPULACAO) {
+        return NULL;
+    }
+
+    Grafo *copia = GGcriaGrafoTipo(
+        quantidadeVertices + RESERVA_MANIPULACAO,
+        quantidadeArestas + RESERVA_MANIPULACAO,
+        GehDirigido(original));
+    if (copia == NULL) {
+        return NULL;
+    }
+
+    for (int vertice = GVprimeiroVertice(original); vertice != -1;
+         vertice = GVproximoVertice(original, vertice)) {
+        Vertice *novoVertice = GVcriaVertice(copia);
+        if (novoVertice == NULL || !GBexisteIdVertice(copia, vertice)) {
+            GGdestroiGrafo(copia);
+            return NULL;
+        }
+    }
+
+    for (int aresta = GAprimeiraAresta(original); aresta != -1;
+         aresta = GAproximaAresta(original, aresta)) {
+        if (GAcriaAresta(copia, GValfa(original, aresta),
+                         GVomega(original, aresta)) == NULL) {
+            GGdestroiGrafo(copia);
+            return NULL;
+        }
+    }
+
+    return copia;
+}
+
+static Grafo *criaGrafoPeloTeclado(void) {
+    int quantidadeVertices;
+    int quantidadeArestas;
+    int dirigido;
+
+    if (!leInteiro("Quantidade de vertices: ", &quantidadeVertices) ||
+        !leInteiro("Quantidade de arestas: ", &quantidadeArestas) ||
+        !leInteiro("Grafo dirigido? (1=sim, 0=nao): ", &dirigido)) {
+        return NULL;
+    }
+
+    if (quantidadeVertices < 0 || quantidadeArestas < 0 ||
+        quantidadeVertices > INT_MAX - RESERVA_MANIPULACAO ||
+        quantidadeArestas > INT_MAX - RESERVA_MANIPULACAO ||
+        (dirigido != 0 && dirigido != 1)) {
+        printf("Quantidade ou tipo de grafo invalido.\n");
+        return NULL;
+    }
+
+    Grafo *grafo = GGcriaGrafoTipo(
+        quantidadeVertices + RESERVA_MANIPULACAO,
+        quantidadeArestas + RESERVA_MANIPULACAO, dirigido);
     if (grafo == NULL) {
         printf("Nao foi possivel criar o grafo.\n");
-        return;
+        return NULL;
     }
 
-    for (int i = 0; i < 6; i++) {
+    for (int i = 0; i < quantidadeVertices; i++) {
         if (GVcriaVertice(grafo) == NULL) {
-            printf("Nao foi possivel adicionar os vertices.\n");
+            printf("Nao foi possivel criar todos os vertices.\n");
             GGdestroiGrafo(grafo);
-            return;
+            return NULL;
         }
     }
 
-    printf("Adicionando arestas e seus pesos:\n");
-    for (int i = 0; i < 8; i++) {
-        if (GAcriaAresta(grafo, arestas[i][0], arestas[i][1]) == NULL) {
-            printf("Nao foi possivel adicionar a aresta a%d.\n", i);
+    printf("Informe a origem e o destino de cada aresta.\n");
+    for (int i = 0; i < quantidadeArestas; i++) {
+        int origem;
+        int destino;
+        printf("Aresta a%d\n", i);
+        if (!leInteiro("  Origem: ", &origem) ||
+            !leInteiro("  Destino: ", &destino)) {
             GGdestroiGrafo(grafo);
-            return;
+            return NULL;
         }
-        printf("  a%d: %d -> %d, peso %.0f\n",
-               i, arestas[i][0], arestas[i][1], pesos[i + 1]);
+
+        if (GAcriaAresta(grafo, origem, destino) == NULL) {
+            printf("Aresta invalida; confira os vertices e duplicatas.\n");
+            GGdestroiGrafo(grafo);
+            return NULL;
+        }
     }
 
-    printf("Vetor de pesos: (0, 1, 1, 1, 1, 1, 1, 1, 1); pesos[0] nao e usado.\n");
-    printf("Procurando o caminho de 3 ate 2...\n");
-    GcaminhoMaisCurto(grafo, pesos, 2, 1);
+    printf("Grafo criado com espaco para mais %d vertices e arestas.\n",
+           RESERVA_MANIPULACAO);
+    return grafo;
+}
 
-    GGdestroiGrafo(grafo);
+static Grafo *carregaGrafoDeArquivo(void) {
+    char nomeArquivo[256];
+    printf("Formato: quantidade de vertices e arestas, seguidas "
+           "pelas extremidades de cada aresta.\n");
+    printf("Arquivo (exemplo: grafo_exemplo.txt): ");
+    if (scanf("%255s", nomeArquivo) != 1) {
+        printf("Nome de arquivo invalido.\n");
+        return NULL;
+    }
+
+    Grafo *carregado = GGcarregaGrafo(nomeArquivo);
+    if (carregado == NULL) {
+        printf("Nao foi possivel carregar '%s'.\n", nomeArquivo);
+        return NULL;
+    }
+
+    Grafo *grafo = copiaComReserva(carregado);
+    GGdestroiGrafo(carregado);
+    if (grafo == NULL) {
+        printf("Nao foi possivel preparar o grafo para manipulacao.\n");
+        return NULL;
+    }
+
+    printf("Grafo carregado de '%s' (o formato e interpretado como "
+           "nao dirigido).\n", nomeArquivo);
+    return grafo;
+}
+
+static void menuManipulacao(Grafo *grafo) {
+    int opcao;
+
+    for (;;) {
+        printf("\n--- Manipular grafo pela TAD ---\n"
+               "1 - Exibir vertices e arestas\n"
+               "2 - Adicionar vertice\n"
+               "3 - Adicionar aresta\n"
+               "4 - Remover aresta\n"
+               "5 - Remover vertice\n"
+               "6 - Consultar aresta\n"
+               "7 - Salvar grafo em arquivo .dot\n"
+               "0 - Voltar\n");
+        if (!leInteiro("Opcao: ", &opcao)) {
+            return;
+        }
+
+        if (opcao == 0) {
+            return;
+        } else if (opcao == 1) {
+            mostraGrafo(grafo);
+        } else if (opcao == 2) {
+            if (GVcriaVertice(grafo) == NULL) {
+                printf("Nao foi possivel adicionar vertice "
+                       "(capacidade atingida).\n");
+            } else {
+                printf("Vertice adicionado.\n");
+                mostraGrafo(grafo);
+            }
+        } else if (opcao == 3) {
+            int origem;
+            int destino;
+            if (!leInteiro("Vertice de origem: ", &origem) ||
+                !leInteiro("Vertice de destino: ", &destino)) {
+                return;
+            }
+            if (GAcriaAresta(grafo, origem, destino) == NULL) {
+                printf("Nao foi possivel adicionar a aresta.\n");
+            } else {
+                printf("Aresta adicionada.\n");
+                mostraGrafo(grafo);
+            }
+        } else if (opcao == 4) {
+            int id;
+            if (!leInteiro("ID da aresta: ", &id)) {
+                return;
+            }
+            printf(GAremoveAresta(grafo, id)
+                       ? "Aresta removida.\n" : "Aresta nao encontrada.\n");
+        } else if (opcao == 5) {
+            int id;
+            if (!leInteiro("ID do vertice: ", &id)) {
+                return;
+            }
+            printf(GVremoveVertice(grafo, id)
+                       ? "Vertice e arestas incidentes removidos.\n"
+                       : "Vertice nao encontrado.\n");
+        } else if (opcao == 6) {
+            int origem;
+            int destino;
+            if (!leInteiro("Primeiro vertice: ", &origem) ||
+                !leInteiro("Segundo vertice: ", &destino)) {
+                return;
+            }
+            printf(GBexisteAresta(grafo, origem, destino)
+                       ? "Aresta encontrada.\n" : "Aresta nao encontrada.\n");
+        } else if (opcao == 7) {
+            char nomeArquivo[256];
+            printf("Nome do arquivo .dot (exemplo: grafo.dot): ");
+            if (scanf("%255s", nomeArquivo) != 1) {
+                return;
+            }
+            if (GBsalvaGrafoDot(grafo, nomeArquivo)) {
+                printf("Grafo salvo em '%s'.\n", nomeArquivo);
+            } else {
+                printf("Nao foi possivel salvar o arquivo.\n");
+            }
+        } else {
+            printf("Opcao invalida.\n");
+        }
+    }
 }
 
 int main(void) {
+    Grafo *grafo = NULL;
     int opcao;
 
-    do {
-        printf("\n=== Teste das TADs ===\n"
-               "1 - Pilha\n"
-               "2 - Fila\n"
-               "3 - Lista\n"
-               "4 - Grafo\n"
-               "5 - Demonstracao de caminho mais curto\n"
-               "0 - Sair\n"
-               "Opcao: ");
-
-        if (scanf("%d", &opcao) != 1) {
-            printf("Entrada invalida.\n");
-            return 1;
+    for (;;) {
+        printf("\n=== TP2: manipulacao de grafos ===\n"
+               "1 - Criar grafo pelo teclado\n"
+               "2 - Ler grafo de arquivo\n"
+               "3 - Manipular grafo pela TAD\n"
+               "0 - Sair\n");
+        if (!leInteiro("Opcao: ", &opcao)) {
+            break;
         }
 
-        switch (opcao) {
-            case 1:
-                testaPilha();
-                break;
-            case 2:
-                testaFila();
-                break;
-            case 3:
-                testaLista();
-                break;
-            case 4:
-                testaGrafo();
-                break;
-            case 5:
-                executaCaminhoComPesos();
-                break;
-            case 0:
-                break;
-            default:
-                printf("Opcao invalida.\n");
+        if (opcao == 0) {
+            break;
+        } else if (opcao == 1 || opcao == 2) {
+            Grafo *novoGrafo = opcao == 1
+                                   ? criaGrafoPeloTeclado()
+                                   : carregaGrafoDeArquivo();
+            if (novoGrafo != NULL) {
+                GGdestroiGrafo(grafo);
+                grafo = novoGrafo;
+                mostraGrafo(grafo);
+            }
+        } else if (opcao == 3) {
+            if (grafo == NULL) {
+                printf("Crie um grafo ou carregue um arquivo primeiro.\n");
+            } else {
+                menuManipulacao(grafo);
+            }
+        } else {
+            printf("Opcao invalida.\n");
         }
-    } while (opcao != 0);
+    }
 
+    GGdestroiGrafo(grafo);
     return 0;
 }
