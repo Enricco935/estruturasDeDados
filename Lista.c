@@ -78,7 +78,7 @@ void insereFim(Lista* lista, No* novoNo) {
     lista->fim = novoNo;
 }
 
-void insereMeio(Lista* lista, No* novoNo, No* noAtual) {
+void insereMeio(No* novoNo, No* noAtual) {
     novoNo->proximo = noAtual;
     novoNo->anterior = noAtual->anterior;
     noAtual->anterior->proximo = novoNo;
@@ -158,7 +158,7 @@ int Linsere(Lista* lista, void* conteudo, int posicao) {
         insereFim(lista, novoNo);
     }
     else {
-        insereMeio(lista, novoNo, encontraNoMenorDistancia(lista, posicao));
+        insereMeio(novoNo, encontraNoMenorDistancia(lista, posicao));
     }
     
     lista->tamanho++;
