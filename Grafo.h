@@ -92,3 +92,9 @@ int GValfa(Grafo* grafo, int a);
 int GVomega(Grafo* grafo, int a);
 
 int GVvizinho(Grafo* grafo, int v, int a);
+
+/* Remoção */
+
+int GAremoveAresta(Grafo* grafo, int a);
+
+int GVremoveVertice(Grafo* grafo, int v);
