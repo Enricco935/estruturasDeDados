@@ -2,13 +2,16 @@
 
 // Alunos:
 // Enricco Augusto Rodrigues Faria  | RA: 0117036
-// João Vitor Da Silva Silverio     | RA: 
+// João Vitor Da Silva Silverio     | RA: 0117181
+// 19/10/2026
 
 // Professor:
 // Walace de Almeida Rodrigues
 
 
 #include <stdio.h>
+#include <stdlib.h>
+#include "AlgoritmoGrafo.h"
 #include "Fila.h"
 #include "Grafo.h"
 #include "Lista.h"
@@ -134,6 +137,44 @@ static void testaGrafo(void) {
     printf("Grafo destruido e memoria liberada.\n");
 }
 
+static void executaCaminhoComPesos(void) {
+    const int arestas[][2] = {{5, 0}, {5, 3}, {2, 5}, {0, 2}, {0, 1}, {1, 2}, {1, 1}, {4, 3}};
+    const float pesos[] = {0, 1, 1, 1, 1, 1, 1, 1, 1};
+
+    printf("\n=== Demonstracao: caminho mais curto ===\n");
+    printf("Criando um grafo dirigido com vertices de 0 a 5.\n");
+    Grafo *grafo = GGcriaGrafoTipo(6, 8, 1);
+    if (grafo == NULL) {
+        printf("Nao foi possivel criar o grafo.\n");
+        return;
+    }
+
+    for (int i = 0; i < 6; i++) {
+        if (GVcriaVertice(grafo) == NULL) {
+            printf("Nao foi possivel adicionar os vertices.\n");
+            GGdestroiGrafo(grafo);
+            return;
+        }
+    }
+
+    printf("Adicionando arestas e seus pesos:\n");
+    for (int i = 0; i < 8; i++) {
+        if (GAcriaAresta(grafo, arestas[i][0], arestas[i][1]) == NULL) {
+            printf("Nao foi possivel adicionar a aresta a%d.\n", i);
+            GGdestroiGrafo(grafo);
+            return;
+        }
+        printf("  a%d: %d -> %d, peso %.0f\n",
+               i, arestas[i][0], arestas[i][1], pesos[i + 1]);
+    }
+
+    printf("Vetor de pesos: (0, 1, 1, 1, 1, 1, 1, 1, 1); pesos[0] nao e usado.\n");
+    printf("Procurando o caminho de 3 ate 2...\n");
+    GcaminhoMaisCurto(grafo, pesos, 2, 1);
+
+    GGdestroiGrafo(grafo);
+}
+
 int main(void) {
     int opcao;
 
@@ -143,6 +184,7 @@ int main(void) {
                "2 - Fila\n"
                "3 - Lista\n"
                "4 - Grafo\n"
+               "5 - Demonstracao de caminho mais curto\n"
                "0 - Sair\n"
                "Opcao: ");
 
@@ -163,6 +205,9 @@ int main(void) {
                 break;
             case 4:
                 testaGrafo();
+                break;
+            case 5:
+                executaCaminhoComPesos();
                 break;
             case 0:
                 break;

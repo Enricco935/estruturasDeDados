@@ -1,3 +1,13 @@
+// Implementação de TADs simples e grafo
+
+// Alunos:
+// Enricco Augusto Rodrigues Faria  | RA: 0117036
+// João Vitor Da Silva Silverio     | RA: 0117181
+// 19/10/2026
+
+// Professor:
+// Walace de Almeida Rodrigues
+
 #include <stdlib.h>
 #include <stdio.h>
 #include "Grafo.h"
