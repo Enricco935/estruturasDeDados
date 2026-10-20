@@ -1,4 +1,4 @@
-// Implementação de TADs simples e grafo
+// Implementação de algoritmos em grafo
 
 // Alunos:
 // Enricco Augusto Rodrigues Faria  | RA: 0117036
